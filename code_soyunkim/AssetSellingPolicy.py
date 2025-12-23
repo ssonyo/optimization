@@ -64,6 +64,7 @@ class AssetSellingPolicy():
             else {'sell': 0, 'hold': 1}
         return new_decision
 
+    # 새로 만든 policy 함수
     def track_policy(self, state, info_tuple):
         """
         Exercise 2.9에 맞춘 time-series 트리거 버전 (보수적 수정):
@@ -74,24 +75,22 @@ class AssetSellingPolicy():
         - pbar_t = 0.7*p_t + 0.2*p_{t-1} + 0.1*p_{t-2}
         """
 
-        # ---- 파라미터 언패킹: 길이 4이면 (theta, gamma, p_{t-1}, p_{t-2}), 길이 3이면 (theta, p_{t-1}, p_{t-2})
         if len(info_tuple) >= 4:
             theta, _gamma_unused, prev_price, prev_price2 = info_tuple[:4]
         else:
             theta, prev_price, prev_price2 = info_tuple
             _gamma_unused = None  # 자리만 맞춰둠
 
-        # ---- 예측값 p̄_t 계산 (문제 식 그대로)
+        # ---- 예측값 p̄_t 계산 
         pbar_t = 0.7 * state.price + 0.2 * prev_price + 0.1 * prev_price2
 
-        # (원한다면 디버그 로그를 남겨도 됨; 출력이 지저분하면 주석 처리)
         '''
         print(
             f"[track→time_series] theta={theta}, p_t={state.price:.4f}, "
             f"pbar_t={pbar_t:.4f}, band=({pbar_t - theta:.4f}, {pbar_t + theta:.4f})"
         )
         '''
-        # ---- 2.9 정책: 절대편차가 theta를 넘으면 매도
+        # ---- 정책: 절대편차가 theta를 넘으면 매도
         if abs(state.price - pbar_t) > theta:
             return {'sell': 1, 'hold': 0}
         else:

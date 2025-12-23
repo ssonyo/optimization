@@ -45,7 +45,7 @@ class MDDMPolicy():
         # print(aux_stats[optimal_decision])
         return optimal_decision
 
-    def IE(self, model_curr, theta):
+    def IE(self, model_curr, theta):  # ??????
         # This method implements the Interval Estimation policy
         stats = {key:getattr(model_curr.state, key)[0]+theta/math.sqrt(getattr(model_curr.state, key)[1]) for key in model_curr.state_names}
 

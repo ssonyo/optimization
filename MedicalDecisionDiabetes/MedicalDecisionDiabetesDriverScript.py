@@ -41,7 +41,7 @@ if __name__ == "__main__":
     print_excel_file=False
     
 
-
+ 
     # in order: Metformin, Sensitizer, Secretagoge, Alpha-glucosidase inhibitor, Peptide analog.
     x_names = ['M', 'Sens', 'Secr', 'AGI', 'PA']
     policy_names = ['UCB', 'IE', 'PureExploitation', 'PureExploration']
@@ -49,9 +49,9 @@ if __name__ == "__main__":
     
     #reading parameter file and initializing variables
     file = 'MDDMparameters.xlsx'
-    S0 = pd.read_excel(file, sheet_name = 'parameters1')
-    additional_params = pd.read_excel(file, sheet_name = 'parameters2')
-    
+    S0 = pd.read_excel(file, sheet_name = 'parameters1', index_col=0)
+    additional_params = pd.read_excel(file, sheet_name = 'parameters2', index_col=0)
+
     
 
     policy_str = additional_params.loc['policy', 0]
@@ -134,7 +134,7 @@ if __name__ == "__main__":
 
                 
                 # determine the best treatment for the sampled truth
-                best_treatment = max(model_copy.mu, key=model_copy.mu.get)
+                best_treatment = max(model_copy.mu, key=model_copy.mu.get) # 가장 reduction이 큰 treatment 선택
                 best_treat[(policy_chosen,theta)].append(best_treatment)
                 best_treat_count = 0
                 decision_list = []
@@ -150,7 +150,7 @@ if __name__ == "__main__":
 
                     # formating pre-decision state for output
                     state_mu = [getattr(model_copy.state,x)[0] for x in x_names]
-                    state_sigma = [1/math.sqrt(getattr(model_copy.state,x)[1]) for x in x_names]
+                    state_sigma = [1/math.sqrt(getattr(model_copy.state,x)[1]) for x in x_names]  # 형태 주의
                     state_N = [getattr(model_copy.state,x)[2] for x in x_names]
                     
                     

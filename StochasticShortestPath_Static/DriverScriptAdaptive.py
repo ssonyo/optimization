@@ -102,7 +102,7 @@ if __name__ == "__main__":
     
     totals = [np.array(obj_along_iterations[theta]).sum() for theta in theta_list]
     print("Totals ",totals)
-
+    
 
     for theta,t in zip(theta_list,nThetas):
         

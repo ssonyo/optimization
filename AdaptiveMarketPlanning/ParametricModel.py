@@ -1,82 +1,76 @@
-"""
-Adaptive Market Planning Model for variable price subclass
 
-"""
-		
-from collections import namedtuple
 from AdaptiveMarketPlanningModel import AdaptiveMarketPlanningModel
-
 import numpy as np
 
 class ParametricModel(AdaptiveMarketPlanningModel):
-	"""
-	Subclass for Adaptive Market Planning
-	"""
+    def __init__(self, state_names, x_names, s_0, T, reward_type,
+                 cost=1.0, price_low=1.0, price_high=10.0,
+                 price_process='RW', seed=20180613):
+        super().__init__(state_names, x_names, s_0, T, reward_type,
+                         cost=cost, seed=seed)
+        self.low = float(price_low)
+        self.high = float(price_high)
+        self.PRICE_PROCESS = price_process
 
-	def __init__(self, state_names, x_names, s_0, T, reward_type, cost = 1.0, price_low = 1.0, price_high = 10.0, exog_info_fn=None, transition_fn=None, objective_fn=None, seed=20180613):
-		"""
-		Initializes the model
+        # Kesten-style sign flip 체크용
+        self.past_derivative = np.array([0.0, 0.0, 0.0], dtype=float)
 
-		See Adaptive Market Planning Model for more details
-        """
-		super().__init__(state_names, x_names, s_0, T, reward_type,cost = cost, exog_info_fn=exog_info_fn, transition_fn=transition_fn, objective_fn=objective_fn, seed=seed)
-		self.past_derivative = np.array([0, 0, 0])
-		self.low = price_low
-		self.high = price_high
-		self.PRICE_PROCESS  ='RW'
-	
-	# returns order quantity for a given price and theta vector
-	def order_quantity_fn(self, price, theta):
-		return max(0,theta[0] + theta[1] * price + theta[2] * price ** (-2))
-	
-	# returns derivative for a given price and theta vector
-	def derivative_fn(self, price, theta):
-		return np.array([1, price, price ** (-2)])
+    # order 및 gradient 함수
+    def order_quantity_fn(self, price, theta):
+        # q = max(0, theta0 + theta1 * p + theta2 * p^{-2})
+        return max(0.0, float(theta[0] + theta[1] * price + theta[2] * price ** (-2)))
 
-	# this function takes in the decision and exogenous information to return
-	# new state
-	def transition_fn(self, decision, exog_info):
+    def derivative_fn(self, price, theta):
+        # dq/dtheta = [1, p, p^{-2}]
+        return np.array([1.0, price, price ** (-2)], dtype=float)
 
-		self.learning_list.append(self.state.theta)
-		print(' theta ',self.state.theta)
-	
-		# compute derivative and update theta
-		derivative = np.array([0, 0, 0])
-		if self.order_quantity_fn(self.state.price, self.state.theta) < exog_info['demand']:
-			derivative = (self.state.price - self.cost) * self.derivative_fn(self.state.price, self.state.theta)
-		else:
-			derivative = (- self.cost) * self.derivative_fn(self.state.price, self.state.theta)
-		
-		new_theta = self.state.theta + decision.step_size * derivative
-	
-		new_counter = self.state.counter + 1 if np.dot(self.past_derivative, derivative) < 0 else self.state.counter
-		print(' step ', decision.step_size)
-		print(' derivative ', derivative)
-		print('new theta ',new_theta)
-		
-		
-		self.past_derivative = derivative
-		
-		# generate random price
-		if (self.PRICE_PROCESS  == 'RW'):
-			coin = self.prng.uniform()
-			delta = 0
-			if coin < .2:
-				delta = -1
-			elif coin >.8:
-				delta = 1
-				
-			new_price = min(self.high,max(self.low,self.state.price + delta))
-		else:
-			new_price = self.prng.uniform(self.low, self.high)
+    # 가격 프로세스
+    def _draw_next_price(self, current_price, rng):
+        if self.PRICE_PROCESS == 'RW':
+            u = rng.uniform()
+            delta = -1.0 if u < 0.2 else (1.0 if u > 0.8 else 0.0)
+            p_next = current_price + delta
+        else:
+            p_next = rng.uniform(self.low, self.high)
+        return float(min(self.high, max(self.low, p_next)))
 
-		
-		
-		return {"counter": new_counter, "price": new_price, "theta": new_theta}
+    # exogenous info
+    def exog_info_fn(self, decision):
+        demand = float(self.prng.exponential(100.0))
+        price_next = float(self._draw_next_price(self.state.price, self.prng))
+        return {"demand": demand, "price_next": price_next}
 
-	# this function calculates how much money we make
-	def objective_fn(self, decision, exog_info):
-		self.price = self.state.price
-		self.order_quantity=self.order_quantity_fn(self.state.price, self.state.theta)
-		obj_part = self.state.price * min(self.order_quantity, exog_info['demand']) - self.cost * self.order_quantity
-		return obj_part
+    # 목적함수
+    def objective_fn(self, decision, exog_info):
+        q = self.order_quantity_fn(self.state.price, self.state.theta)
+        self.order_quantity = q
+
+        p_next = exog_info["price_next"]
+        d = exog_info["demand"]
+        # Ft = p_{t+1} * min(q, d) - c*q
+        return p_next * min(q, d) - self.cost * q
+
+    # SGD 업데이트 
+    def transition_fn(self, decision, exog_info):
+        self.learning_list.append(self.state.theta.copy())
+
+        # gradient용 가격도 p_{t+1}
+        p_for_grad = exog_info["price_next"]
+
+        q = self.order_quantity_fn(self.state.price, self.state.theta)
+        dq_dtheta = self.derivative_fn(self.state.price, self.state.theta)
+
+        if q < exog_info["demand"]:
+            grad = (p_for_grad - self.cost) * dq_dtheta
+        else:
+            grad = (-self.cost) * dq_dtheta
+
+        # 부호 전환 카운팅
+        new_counter = self.state.counter + 1 if np.dot(self.past_derivative, grad) < 0 else self.state.counter
+        self.past_derivative = grad.copy()
+
+        # theta, price업데이트
+        new_theta = self.state.theta + decision.step_size * grad
+        new_price = exog_info["price_next"]
+
+        return {"counter": int(new_counter), "price": float(new_price), "theta": new_theta}

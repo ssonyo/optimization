@@ -15,7 +15,7 @@ def Beta(sigma):
 class MedicalDecisionDiabetesModel():
     """
     Base class for Medical Decisions Diabetes Treatments model
-    """
+ """
 
     def __init__(self, state_names, x_names, S0, additional_params, exog_info_fn=None, transition_fn=None, objective_fn=None, seed=20180529):
         """
@@ -49,11 +49,11 @@ class MedicalDecisionDiabetesModel():
         self.t = 0 # time counter (in months)
 
 
-        if self.truth_type == 'fixed_uniform':
+        if self.truth_type == 'fixed_uniform': # 4.17 (a)
             self.truth_params_dict = {x:[S0.loc[x, 'mu_fixed'],S0.loc[x, 'fixed_uniform_a'],S0.loc[x, 'fixed_uniform_b']] for x in self.x_names }
-        elif self.truth_type == 'prior_uniform':
+        elif self.truth_type == 'prior_uniform': # 4.17 (b)
             self.truth_params_dict = {x:[S0.loc[x, 'mu_0'],S0.loc[x, 'prior_mult_a'],S0.loc[x, 'prior_mult_b']] for x in self.x_names }
-        else:
+        else: # 4.16
             self.truth_params_dict = {x:[S0.loc[x, 'mu_truth'],S0.loc[x, 'sigma_truth'],0] for x in self.x_names }
 
         
@@ -93,7 +93,7 @@ class MedicalDecisionDiabetesModel():
             self.mu = {x:self.truth_params_dict[x][0] + self.prng.uniform(self.truth_params_dict[x][1],self.truth_params_dict[x][2]) for x in self.x_names}
         elif self.truth_type == "prior_uniform":
             self.mu = {x:self.truth_params_dict[x][0] + self.prng.uniform(self.truth_params_dict[x][1]*self.truth_params_dict[x][0],self.truth_params_dict[x][2]*self.truth_params_dict[x][0]) for x in self.x_names}
-        else:
+        else: # normal
             self.mu = {x:self.prng.normal(self.truth_params_dict[x][0], self.truth_params_dict[x][1]) for x in self.x_names}
 
 
